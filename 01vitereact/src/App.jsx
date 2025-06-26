@@ -5,12 +5,12 @@ import Chai from './chai'
 
 
 function App() {
-  const [count, setCount] = useState(0)
+  const username="chai aur code"
 
   return (
     <>
       <Chai/>
-      <h1>chai aur react</h1>
+      <h1>chai aur react{username}</h1>
     </>
     
   )
