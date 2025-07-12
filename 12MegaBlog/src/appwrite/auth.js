@@ -42,9 +42,9 @@ export class Authservice{
             return user;
         } catch (error) {
             console.error('Error getting current user:', error);
-            throw error;
+            return null;
         }
-        return null;
+        
     }
     async logout() {
         try {
