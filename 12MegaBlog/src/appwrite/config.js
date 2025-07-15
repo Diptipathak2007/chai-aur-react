@@ -1,136 +1,158 @@
-import { serialize } from 'v8';
 import conf from '../conf/conf.js';
-import { Client,ID,Databases,Storage,Query} from 'appwrite';
+import { Client, ID, Databases, Storage, Query } from 'appwrite';
 
-export class Service{
-    client=new Client();
+export class Service {
+    client = new Client();
     databases;
     bucket;
-    constructor(){
+    
+    constructor() {
         this.client
             .setEndpoint(conf.appwriteUrl)
             .setProject(conf.appwriteProjectId);
-        this.databases=new Databases(this.client);
-        this.bucket=new Storage(this.client);
+        this.databases = new Databases(this.client);
+        this.bucket = new Storage(this.client);
     }
-    async createPost({title,slug,content,featuredImage,status,userId}){
+
+    // Permission check method
+    async checkPermissions() {
         try {
-            const response = await this.databases.createDocument(
+            await this.databases.listDocuments(
                 conf.appwriteDatabaseId,
                 conf.appwriteCollectionId,
-                slug,//u can use slug as document ID or if you want to use unique ID then use ID.unique()
+                [Query.limit(1)]
+            );
+            return true;
+        } catch (error) {
+            console.error("Permission check failed:", error);
+            return false;
+        }
+    }
+
+    // Post methods
+    async createPost({ title, slug, content, featuredimage, status, userid }) {
+        try {
+            return await this.databases.createDocument(
+                conf.appwriteDatabaseId,
+                conf.appwriteCollectionId,
+                slug,
                 {
                     title,
                     content,
-                    featuredImage,
+                    featuredimage,
                     status,
-                    userId
+                    userid
                 }
             );
-            return response;
-        }
-        catch (error) {
-            console.error('Error creating post:', error);
+        } catch (error) {
+            console.error("Error creating post:", error);
             throw error;
         }
     }
 
-    async updatePost(slug,{title,content,featuredImage,status}){
+    async updatePost(slug, { title, content, featuredimage, status }) {
         try {
-            const response = await this.databases.updateDocument(
+            return await this.databases.updateDocument(
                 conf.appwriteDatabaseId,
                 conf.appwriteCollectionId,
                 slug,
-                {
-                    title,
-                    content,
-                    featuredImage,
-                    status
-                }
+                { title, content, featuredimage, status }
             );
-            return response;
         } catch (error) {
-            console.error('Error updating post:', error);
+            console.error("Error updating post:", error);
             throw error;
         }
     }
-    async deletePost(slug){
-        try{
-            const response=await this.databases.deleteDocument(
+
+    async deletePost(slug) {
+        try {
+            await this.databases.deleteDocument(
                 conf.appwriteDatabaseId,
                 conf.appwriteCollectionId,
-                slug,
+                slug
             );
             return true;
-            
-        }
-        catch(error){
-            console.error('Error deleting post:', error);
-            return false;
+        } catch (error) {
+            console.error("Error deleting post:", error);
+            throw error;
         }
     }
-    async getPost(slug){
-        try{
+
+    async getPost(slug) {
+        try {
             return await this.databases.getDocument(
                 conf.appwriteDatabaseId,
                 conf.appwriteCollectionId,
                 slug
             );
-        }
-        catch{
-            console.log("Appwrite service::getPost::error",error);
-            return false;
+        } catch (error) {
+            console.error("Error getting post:", error);
+            throw error;
         }
     }
-    async getPosts(queries=[Query.equal('status','active')]){
+
+    async getPosts(queries = [Query.equal('status', 'active')]) {
         try {
-            const response = await this.databases.listDocuments(
+            return await this.databases.listDocuments(
                 conf.appwriteDatabaseId,
                 conf.appwriteCollectionId,
                 queries
             );
-            return response;
-        }
-        catch (error) {
-            console.error('Error fetching posts:', error);
-            return false;
+        } catch (error) {
+            console.error("Error fetching posts:", error);
+            throw error;
         }
     }
 
-    //file upload service
-
-    async uploadFile(file){
+    // File methods
+    async uploadFile(file) {
         try {
-            const response = this.bucket.createFile(
+            if (!file) throw new Error("No file provided");
+            if (file.size > 5 * 1024 * 1024) throw new Error("File size exceeds 5MB limit");
+            
+            return await this.bucket.createFile(
                 conf.appwriteBucketId,
                 ID.unique(),
                 file
             );
-            return response;
         } catch (error) {
-            console.error('Error uploading file:', error);
-            return false;
+            console.error("Error uploading file:", error);
+            throw error;
         }
     }
 
-    async deleteFile(fileId){
+    async deleteFile(fileId) {
         try {
-            const response = this.bucket.deleteFile(
+            if (!fileId) throw new Error("No file ID provided");
+            return await this.bucket.deleteFile(
                 conf.appwriteBucketId,
                 fileId
             );
-            return response;
         } catch (error) {
-            console.error('Error deleting file:', error);
-            return false;
+            console.error("Error deleting file:", error);
+            throw error;
         }
     }
-    getFilePreview(fileId){
-        return this.bucket.getFilePreview(
+
+    getFilePreview(fileId) {
+        if (!fileId) return null;
+        try {
+          // Add width/height parameters for consistent previews
+          return this.bucket.getFilePreview(
             conf.appwriteBucketId,
-            fileId
-        );
-    }
+            fileId,
+            800, // width
+            600, // height
+            "top", // gravity
+            90, // quality (1-100)
+            "webp" // preferred modern format
+          ).href;
+        } catch (error) {
+          console.error("Error generating preview:", error);
+          return "/default-image.jpg"; // Fallback image
+        }
+      }
 }
-const service=new Service();
+
+const service = new Service();
 export default service;
